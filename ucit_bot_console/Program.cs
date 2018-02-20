@@ -30,18 +30,38 @@ namespace ucit_bot_console
 
             Bot = new TelegramBotClient(key);
             Bot.OnMessage += BotOnMessageReceived; // подписка на события сообщения от пользователей
-          //  Bot.OnCallbackQuery += BotOnCallbackQueryRecived;
+                                                   //  Bot.OnCallbackQuery += BotOnCallbackQueryRecived;
 
             Bot.StartReceiving();
             Console.ReadLine();
             Bot.StopReceiving();
 
         }
-   
 
-        private async static void Schedule(ChatId telegram_chat_id, bool user_request)
-        {   
+        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
+        {
             string url = "http://ucit.ru/rasp.php";//страница для парсинга
+            string pattern_start = @"Текущая неделя №.+\d\D+февраля 2018";//шаблон до которого надо отрезать лишнее от начала файла
+            string pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
+            string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
+
+            string content = MySchedule(url, pattern_start, pattern_end, for_replace);
+
+            string file_path = @"d:\YandexDisk\UCIT2017\rasp\";
+            string file_name = @"shedold";
+
+            MyScheduleSave(content, file_path, file_name, is_user_request);
+
+            Uri shed_pic = new Uri("https://2.downloader.disk.yandex.ru/preview/4e4ab7e525ff874072a7e70256915fa71aa3190f26ce88cbfe7e7f71bc90bcc3/inf/ydqD8sJdOF9-4IOwMMPZ_oDJ0MQIT5sZ9JcvkjC1strfbrUa-XqtUSkYMy9LZuZ_OjpUXi85R9t7OERNDvQkAA%3D%3D?uid=0&filename=shedold.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&tknv=v2&size=XXL&crop=0");//ССылка на картинку через яндекс диск
+            string caption_text = "Снимок расписания ";
+            DateTime thisDay = DateTime.Today;
+            await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));
+
+        }
+
+
+        private static string MySchedule(string url, string pattern_start, string pattern_end, string[]for_replace)
+        {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "GET";
             request.ContentType = "application/x-www-form-urlencoded";
@@ -51,49 +71,51 @@ namespace ucit_bot_console
             StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.GetEncoding(1251));
             string content = "";
             content = reader.ReadToEnd();
-            
-            string pattern = @"Текущая неделя №.+\d\D+февраля 2018";//шаблон до которого надо отрезать лишнее от начала файла
-            Regex regex = new Regex(pattern);
+
+           // pattern_start = @"Текущая неделя №.+\d\D+февраля 2018";//шаблон до которого надо отрезать лишнее от начала файла
+            Regex regex = new Regex(pattern_start);
             Match index = regex.Match(content);//Определяем позицию строки, до которой нужно все отрезать  
             content = content.Substring(index.Index);//отрезать с начала до текущего индекса
-                                                    
-            pattern = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
-            regex = new Regex(pattern);
+
+            //pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
+            regex = new Regex(pattern_end);
             index = regex.Match(content);//Определяем позицию строки, после которой нужно все отрезать
             content = content.Remove(index.Index);//отрезать от индекса до конца
 
             //если в тексте встречается текст, который нам не нужен, вырезаем его
-            content = content.Replace("</div>", "");
-            content = content.Replace("&nbsp;", "");
+            foreach (string element in for_replace)
+                                            content = content.Replace(element,"");
+           
+            return content;
+        }
 
-            // Путь для сохранения файлов и название файлов
-            string file_path = @"d:\YandexDisk\UCIT2017\rasp\";
-            string file_name = @"shedold.html";
-            string image_name = @"shedold.png";
-            FileInfo shedold = new FileInfo(file_path + file_name);
+        private static bool MyScheduleSave(string new_content, string file_path, string file_name, bool is_user_request)
+        {
+            
+            string ext_html = @".html";
+            string ext_png = @".png";
+                       FileInfo shedold = new FileInfo(file_path + file_name + ext_html);
             if (!shedold.Exists)
             {
-                System.IO.File.WriteAllText(file_path + file_name, "");
+                System.IO.File.WriteAllText(file_path + file_name + ext_html, "");
             }
-            string file = System.IO.File.ReadAllText(file_path + file_name);
+            string old_file = System.IO.File.ReadAllText(file_path + file_name + ext_html);
 
-            if ((content != file) || user_request )
+            if ((new_content != old_file) || is_user_request)
             {
-                System.IO.File.WriteAllText(file_path + file_name, content, Encoding.GetEncoding(65001));
+                System.IO.File.WriteAllText(file_path + file_name + ext_html, new_content, Encoding.GetEncoding(65001));
 
-                var screenshotJob = ScreenshotJobBuilder.Create(file_path + file_name)
+                var screenshotJob = ScreenshotJobBuilder.Create(file_path + file_name+ ext_html)
                .SetBrowserSize(900, 400)
                .SetCaptureZone(CaptureZone.FullPage) // Зона захвата
                .SetTrigger(new WindowLoadTrigger()); // Set when the picture is taken
-                System.IO.File.WriteAllBytes(file_path + image_name, screenshotJob.Freeze());
-                                               
-                Uri shed_pic = new Uri("https://2.downloader.disk.yandex.ru/preview/4e4ab7e525ff874072a7e70256915fa71aa3190f26ce88cbfe7e7f71bc90bcc3/inf/ydqD8sJdOF9-4IOwMMPZ_oDJ0MQIT5sZ9JcvkjC1strfbrUa-XqtUSkYMy9LZuZ_OjpUXi85R9t7OERNDvQkAA%3D%3D?uid=0&filename=shedold.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&tknv=v2&size=XXL&crop=0");//ССылка на картинку через яндекс диск
-                string caption_text = "Снимок расписания ";
-                DateTime thisDay = DateTime.Today;
-                await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));             
+                System.IO.File.WriteAllBytes(file_path + file_name + ext_png, screenshotJob.Freeze());                      
 
             }
+            return true; 
+
         }
+
 
         private async static void VkCheck(ChatId telegram_chat_id)
         {
@@ -156,21 +178,28 @@ if($wall!=$file)
             string name = $"{message.From.FirstName} {message.From.LastName}";
             Console.WriteLine($"Сообщение из чата {message.Chat.Title} id {message.Chat.Id}  от {name} id {message.From.Id} : '{message.Text}'");
 
-            switch (message.Text)
+            switch (message.Text.ToLower())
             {
                 case "/start":
                     string text =
                         @"Список команд:
 /start - запуск бота
 /rasp - вывести расписание
-Или отправить текст 'Расписание'
-/keyboard - вывод клавиатуры";
+/keyboard - вывод клавиатуры
+Еще я понимаю фразы:
+'Привет бот' - поприветсовать бота
+'Расписание' - вывести расписание
+'ucit.ru' - ссылка на расписание
+'Группа VK' - ссылка на группу в VK
+'Я.диск' - ссылка на Яндекс диск
+ ";
+
                     await Bot.SendTextMessageAsync(message.Chat.Id, text);
                     break;
 
-                case "/rasp":
+                case "/rasp" :
                     await Bot.SendTextMessageAsync(message.Chat.Id, $"{name} Смотри и учись!");
-                    Schedule(message.Chat.Id, true);
+                    ScheduleCheckAndSend(message.Chat.Id, true);
                     break;
 
                 case "/inline":
@@ -183,10 +212,7 @@ if($wall!=$file)
                     new[]
                     {
                         InlineKeyboardButton.WithUrl("Расписание","http://ucit.ru/rasp.php"),
-                         InlineKeyboardButton.WithUrl("Я.Диск","https://yadi.sk/d/zk4sn3pAptaXz")
-                        
-
-
+                         InlineKeyboardButton.WithUrl("Я.Диск","https://yadi.sk/d/zk4sn3pAptaXz")  
                     }
                     });
                     await Bot.SendTextMessageAsync(message.Chat.Id, "Выберите пункт меню", replyMarkup: inlineKeyboard);
@@ -208,8 +234,7 @@ if($wall!=$file)
                      });
                     await Bot.SendTextMessageAsync(message.Chat.Id, "Какой ответ? ", ParseMode.Default, false, false, 0, replyMarkup: replyKeyboard);                  
                     break;
-                default:
-                    //await Bot.SendTextMessageAsync(message.Chat.Id, "Действие не опознано, попробуй ещё");
+                default:                    
                     break;
             }
 
@@ -218,7 +243,8 @@ if($wall!=$file)
             {
 
                 await Bot.SendTextMessageAsync(message.Chat.Id, $"{name} Смотри и учись!");
-                Schedule(message.Chat.Id, true);
+                ScheduleCheckAndSend(message.Chat.Id, true);
+               
             }
             if (message.Text.ToLower() == "ucit.ru")
             {
