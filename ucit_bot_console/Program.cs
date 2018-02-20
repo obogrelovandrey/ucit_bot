@@ -36,7 +36,6 @@ namespace ucit_bot_console
             Console.ReadLine();
             Bot.StopReceiving();
 
-
         }
    
 
