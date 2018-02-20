@@ -101,8 +101,10 @@ namespace ucit_bot_console
 
             /*
              * //VK
+
+ string key_path = @"d:\YandexDisk\UCIT2017\rasp\token_vk";
+ string token_vk = System.IO.File.ReadAllText(key_path);
 $vk_wall_id="108679504";
-$token_vk = "628a62f0628a62f0628a62f09e62eae0ac6628a628a62f038d9df8c722cbb3559ea68ca";
 $vk_text = "https://vk.com/wall-";
              // Удаляем минус у ID групп, что мы используем выше (понадобится для ссылки).
 $group_id = preg_replace("/-/i", "", $vk_wall_id);
