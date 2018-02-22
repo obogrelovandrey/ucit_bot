@@ -39,10 +39,10 @@ namespace ucit_bot_console
                 VkCheck(telegram_chat_id, vk_wall_id, file_path);
                 ScheduleCheckAndSend(telegram_chat_id, false);
                 Thread.Sleep(14400000);
-                //Thread.Sleep(10000);
+              
             }            
-            Console.ReadLine();
-            Bot.StopReceiving();  
+            //Console.ReadLine();
+            //Bot.StopReceiving();  
             }
       
         private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
@@ -58,13 +58,13 @@ namespace ucit_bot_console
             string file_name = @"shedold";
             string url_png = @"https://2.downloader.disk.yandex.ru/preview/4e4ab7e525ff874072a7e70256915fa71aa3190f26ce88cbfe7e7f71bc90bcc3/inf/ydqD8sJdOF9-4IOwMMPZ_oDJ0MQIT5sZ9JcvkjC1strfbrUa-XqtUSkYMy9LZuZ_OjpUXi85R9t7OERNDvQkAA%3D%3D?uid=0&filename=shedold.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&tknv=v2&size=XXL&crop=0";//ССылка на картинку через яндекс диск";
 
-            if (IsScheduleSave(content, file_path, file_name, is_user_request))
+            if (IsScheduleSaved(content, file_path, file_name, is_user_request))
             {
 
                 Uri shed_pic = new Uri(url_png);
                 string caption_text = "Снимок расписания ";
                 DateTime thisDay = DateTime.Today;
-                await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));
+                
                 Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
 
                 if (x.Caption == caption_text + thisDay.ToString("d"))
@@ -74,9 +74,8 @@ namespace ucit_bot_console
                 }
                 else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
             }
-            else await Bot.SendTextMessageAsync(telegram_chat_id, $"Изменений в расписании нет");
+           
         }
-        
         private static string ScheduleGet(string url, string pattern_start, string pattern_end, string[]for_replace)
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -105,8 +104,7 @@ namespace ucit_bot_console
            
             return content;
         }
-
-        private static bool IsScheduleSave(string new_content, string file_path, string file_name, bool is_user_request)
+        private static bool IsScheduleSaved(string new_content, string file_path, string file_name, bool is_user_request)
         {
             
             string ext_html = @".html";
@@ -132,7 +130,6 @@ namespace ucit_bot_console
             return false;
 
         }
-
         private  async static void VkCheck(ChatId telegram_chat_id, string vk_wall_id , string file_path) //ChatId telegram_chat_id
         {   
             string key_path = @"d:\YandexDisk\UCIT2017\rasp\token_vk";
