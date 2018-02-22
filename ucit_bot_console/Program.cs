@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using System.Net;
 using System.IO;
-using System.Drawing;
 
 using Telegram.Bot;
 using Telegram.Bot.Args;
@@ -15,7 +12,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 using Telegram.Bot.Types.InlineKeyboardButtons;
 using Freezer.Core;
 using System.Text.RegularExpressions;
-using System.Timers;
+
 
 namespace ucit_bot_console
 {
@@ -26,18 +23,28 @@ namespace ucit_bot_console
         static void Main(string[] args)
         {
             string key_path = @"d:\YandexDisk\UCIT2017\rasp\key";
-            string key = System.IO.File.ReadAllText(key_path);
-
+            string key = System.IO.File.ReadAllText(key_path);        
+            string file_path = @"d:\YandexDisk\UCIT2017\rasp\";
+            
             Bot = new TelegramBotClient(key);
             Bot.OnMessage += BotOnMessageReceived; // подписка на события сообщения от пользователей
-                                                   //  Bot.OnCallbackQuery += BotOnCallbackQueryRecived;
 
-            Bot.StartReceiving();
+            string telegram_chat_id = "-266006208";
+            string vk_wall_id = "108679504";
+                     
+            Bot.StartReceiving();                   
+           
+            while (true)
+            {
+                VkCheck(telegram_chat_id, vk_wall_id, file_path);
+                ScheduleCheckAndSend(telegram_chat_id, false);
+                Thread.Sleep(14400000);
+                //Thread.Sleep(10000);
+            }            
             Console.ReadLine();
-            Bot.StopReceiving();
-
-        }
-
+            Bot.StopReceiving();  
+            }
+      
         private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
         {
             string url = "http://ucit.ru/rasp.php";//страница для парсинга
@@ -45,22 +52,32 @@ namespace ucit_bot_console
             string pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
             string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
 
-            string content = MySchedule(url, pattern_start, pattern_end, for_replace);
+            string content = ScheduleGet(url, pattern_start, pattern_end, for_replace);
 
             string file_path = @"d:\YandexDisk\UCIT2017\rasp\";
             string file_name = @"shedold";
+            string url_png = @"https://2.downloader.disk.yandex.ru/preview/4e4ab7e525ff874072a7e70256915fa71aa3190f26ce88cbfe7e7f71bc90bcc3/inf/ydqD8sJdOF9-4IOwMMPZ_oDJ0MQIT5sZ9JcvkjC1strfbrUa-XqtUSkYMy9LZuZ_OjpUXi85R9t7OERNDvQkAA%3D%3D?uid=0&filename=shedold.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&tknv=v2&size=XXL&crop=0";//ССылка на картинку через яндекс диск";
 
-            MyScheduleSave(content, file_path, file_name, is_user_request);
+            if (IsScheduleSave(content, file_path, file_name, is_user_request))
+            {
 
-            Uri shed_pic = new Uri("https://2.downloader.disk.yandex.ru/preview/4e4ab7e525ff874072a7e70256915fa71aa3190f26ce88cbfe7e7f71bc90bcc3/inf/ydqD8sJdOF9-4IOwMMPZ_oDJ0MQIT5sZ9JcvkjC1strfbrUa-XqtUSkYMy9LZuZ_OjpUXi85R9t7OERNDvQkAA%3D%3D?uid=0&filename=shedold.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&tknv=v2&size=XXL&crop=0");//ССылка на картинку через яндекс диск
-            string caption_text = "Снимок расписания ";
-            DateTime thisDay = DateTime.Today;
-            await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));
+                Uri shed_pic = new Uri(url_png);
+                string caption_text = "Снимок расписания ";
+                DateTime thisDay = DateTime.Today;
+                await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));
+                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
 
+                if (x.Caption == caption_text + thisDay.ToString("d"))
+                {
+                    Console.WriteLine("Обновилась расписание на сайте");
+
+                }
+                else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
+            }
+            else await Bot.SendTextMessageAsync(telegram_chat_id, $"Изменений в расписании нет");
         }
-
-
-        private static string MySchedule(string url, string pattern_start, string pattern_end, string[]for_replace)
+        
+        private static string ScheduleGet(string url, string pattern_start, string pattern_end, string[]for_replace)
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
             request.Method = "GET";
@@ -89,12 +106,12 @@ namespace ucit_bot_console
             return content;
         }
 
-        private static bool MyScheduleSave(string new_content, string file_path, string file_name, bool is_user_request)
+        private static bool IsScheduleSave(string new_content, string file_path, string file_name, bool is_user_request)
         {
             
             string ext_html = @".html";
             string ext_png = @".png";
-                       FileInfo shedold = new FileInfo(file_path + file_name + ext_html);
+            FileInfo shedold = new FileInfo(file_path + file_name + ext_html);
             if (!shedold.Exists)
             {
                 System.IO.File.WriteAllText(file_path + file_name + ext_html, "");
@@ -106,68 +123,61 @@ namespace ucit_bot_console
                 System.IO.File.WriteAllText(file_path + file_name + ext_html, new_content, Encoding.GetEncoding(65001));
 
                 var screenshotJob = ScreenshotJobBuilder.Create(file_path + file_name+ ext_html)
-               .SetBrowserSize(900, 400)
-               .SetCaptureZone(CaptureZone.FullPage) // Зона захвата
+               .SetBrowserSize(900, 500)
+               .SetCaptureZone(CaptureZone.VisibleScreen) // Зона захвата
                .SetTrigger(new WindowLoadTrigger()); // Set when the picture is taken
                 System.IO.File.WriteAllBytes(file_path + file_name + ext_png, screenshotJob.Freeze());                      
-
-            }
             return true; 
+            }
+            return false;
 
         }
 
+        private  async static void VkCheck(ChatId telegram_chat_id, string vk_wall_id , string file_path) //ChatId telegram_chat_id
+        {   
+            string key_path = @"d:\YandexDisk\UCIT2017\rasp\token_vk";
+            string token_vk = System.IO.File.ReadAllText(key_path);
+            string vk_text = "https://vk.com/wall-"; 
+             // Количество записей, которое нам нужно получить.
+            string count_item = "1";
+            // Получаем информацию, подставив все данные выше.
+            Uri uri = new Uri ($"https://api.vk.com/api.php?oauth=1&method=wall.get.xml&owner_id=-"+vk_wall_id+"&count="+count_item+"&v=5.69&access_token="+token_vk); 
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = "GET";
+            request.ContentType = "application/x-www-form-urlencoded";
+            request.UserAgent = "Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US) AppleWebKit/532.5 (KHTML, like Gecko) Chrome/4.0.249.89 Safari/532.5";
+            request.KeepAlive = true;
+            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+            StreamReader reader = new StreamReader(response.GetResponseStream(), Encoding.GetEncoding(1251));
+            string new_post_id = reader.ReadToEnd();
+                           
+            string pattern_id = "<id>(\\w+)[0-9]";
+            Regex regex = new Regex(pattern_id);
+            Match index = regex.Match(new_post_id);
+            new_post_id = index.ToString().Replace("<id>", "");
+                       
+            string file_name = @"vkold";
 
-        private async static void VkCheck(ChatId telegram_chat_id)
-        {
+            FileInfo vkold = new FileInfo(file_path + file_name);
+            if (!vkold.Exists)
+            {
+                System.IO.File.WriteAllText(file_path + file_name, "");
+            }
+            string old_file = System.IO.File.ReadAllText(file_path + file_name);
 
-            /*
-             * //VK
+            if (new_post_id != old_file)
+            {
+                System.IO.File.WriteAllText(file_path + file_name, new_post_id);
+                Message x = await Bot.SendTextMessageAsync(telegram_chat_id, vk_text + vk_wall_id + "_" + new_post_id);
 
- string key_path = @"d:\YandexDisk\UCIT2017\rasp\token_vk";
- string token_vk = System.IO.File.ReadAllText(key_path);
-$vk_wall_id="108679504";
-$vk_text = "https://vk.com/wall-";
-             // Удаляем минус у ID групп, что мы используем выше (понадобится для ссылки).
-$group_id = preg_replace("/-/i", "", $vk_wall_id);
- // Количество записей, которое нам нужно получить.
-$count_item = "1";
-
- // Получаем информацию, подставив все данные выше.
-$api = file_get_contents("https://api.vk.com/api.php?oauth=1&method=wall.get&owner_id=-{$vk_wall_id}&count={$count_item}&v=5.69&access_token={$token_vk}");
-
-// Преобразуем JSON-строку в массив
-$wall = json_decode($api);
-
-// Получаем номер записи
-$post_id = $wall->response->items[0]->id ;
-
-$file = file_get_contents('vkold'); //читаем файл со старой информацию
-if($wall!=$file)
-{
-	file_put_contents('vkold', $wall);
-	//echo iconv("windows-1251", "UTF-8", $wall); 
-	//$som='Обновилось расписание ucit.ru/rasp.php';
-
-	$sendToTelegram = fopen("{$urltelegram}{$telegram_group_id}&text={$vk_text}{$group_id}_{$post_id}","r");
-	$sendToTelegram = fopen("{$urltelegram}{$telegram_chanal_id}&text={$vk_text}{$group_id}_{$post_id}","r");
-	//$sendToTelegram = fopen("{$urltelegram}{$telegram_chat_id}&text={$vk_text}{$group_id}_{$post_id}","r");
-}
-
-             
-             
-             */
-            Console.WriteLine();
-        }
-        
-      /*  private static async void BotOnCallbackQueryRecived(object sender, CallbackQueryEventArgs e)
-        {
-            string buttonText = e.CallbackQuery.Data;
-            string name = $"{e.CallbackQuery.From.FirstName} {e.CallbackQuery.From.LastName}";
-            Console.WriteLine($"{name} Нажал кнопку {buttonText}");
-            await Bot.AnswerCallbackQueryAsync(e.CallbackQuery.Id, $"Вы нажали кнопку {buttonText}");
-           
-        }
-        */
+                if (x.Text == vk_text + vk_wall_id + "_" + new_post_id)
+                {
+                    Console.WriteLine("Обновилась запись в группе ВК");
+                   
+                }
+                    else Console.WriteLine("Ошибка обновления ВК");
+            }
+          }   
         private static async  void BotOnMessageReceived(object sender, MessageEventArgs e)
         {
             var message = e.Message;
