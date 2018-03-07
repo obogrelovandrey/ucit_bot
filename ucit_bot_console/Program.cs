@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Text;
 using System.Threading;
 using System.Net;
@@ -21,42 +22,45 @@ namespace ucit_bot_console
         static TelegramBotClient Bot;
 
         static void Main(string[] args)
+
         {
-            string key_path = @"d:\YandexDisk\UCIT2017\rasp\key";
-            string key = System.IO.File.ReadAllText(key_path);        
-            string file_path = @"d:\YandexDisk\UCIT2017\rasp\";
-            
+            // int v2 = int.Parse(ConfigurationManager.AppSettings["Переменная2"]);
+
+            string file_path = ConfigurationManager.AppSettings["file_path"];
+            string key = ConfigurationManager.AppSettings["telegram_token"];
+           
             Bot = new TelegramBotClient(key);
             Bot.OnMessage += BotOnMessageReceived; // подписка на события сообщения от пользователей
 
-            string telegram_chat_id = "-266006208";
-            string vk_wall_id = "108679504";
+            string telegram_chat_id = ConfigurationManager.AppSettings["telegram_chat_id"];
+            string vk_wall_id = ConfigurationManager.AppSettings["vk_wall_id"];
                      
             Bot.StartReceiving();                   
            
             while (true)
             {
                 VkCheck(telegram_chat_id, vk_wall_id, file_path);
-                ScheduleCheckAndSend(telegram_chat_id, false);
-                Thread.Sleep(14400000);
-              
+                ScheduleCheckAndSend(telegram_chat_id, false, file_path);
+                Thread.Sleep(14400000);              
             }            
             //Console.ReadLine();
             //Bot.StopReceiving();  
             }
       
-        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
+        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request, string file_path ) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
         {
-            string url = "http://ucit.ru/rasp.php";//страница для парсинга
-            string pattern_start = @"Текущая неделя №.+\d\D+февраля 2018";//шаблон до которого надо отрезать лишнее от начала файла
+            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
+            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//шаблон до которого надо отрезать лишнее от начала файла
+            string pattern_start = @"Текущая неделя №.+\d\D+";//шаблон до которого надо отрезать лишнее от начала файла            
             string pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
+            string pattern = pattern_start + pattern_group;//шаблон до которого надо отрезать лишнее от начала файла
             string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
-
-            string content = ScheduleGet(url, pattern_start, pattern_end, for_replace);
-
-            string file_path = @"d:\YandexDisk\UCIT2017\rasp\";
+            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
+          
             string file_name = @"shedold";
-            string url_png = @"https://2.downloader.disk.yandex.ru/preview/4e4ab7e525ff874072a7e70256915fa71aa3190f26ce88cbfe7e7f71bc90bcc3/inf/ydqD8sJdOF9-4IOwMMPZ_oDJ0MQIT5sZ9JcvkjC1strfbrUa-XqtUSkYMy9LZuZ_OjpUXi85R9t7OERNDvQkAA%3D%3D?uid=0&filename=shedold.png&disposition=inline&hash=&limit=0&content_type=image%2Fpng&tknv=v2&size=XXL&crop=0";//ССылка на картинку через яндекс диск";
+            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
+            string url_png = get_url_png.Replace( "&amp;","&");//заменить символы ;
+
 
             if (IsScheduleSaved(content, file_path, file_name, is_user_request))
             {
@@ -70,11 +74,43 @@ namespace ucit_bot_console
                 if (x.Caption == caption_text + thisDay.ToString("d"))
                 {
                     Console.WriteLine("Обновилась расписание на сайте");
-
                 }
                 else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
             }
            
+        }
+        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
+        {
+            string file_path = ConfigurationManager.AppSettings["file_path"];
+            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
+            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//шаблон до которого надо отрезать лишнее от начала файла
+            string pattern_start = @"Текущая неделя №.+\d\D+";//шаблон до которого надо отрезать лишнее от начала файла
+            string pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
+            string pattern = pattern_start + pattern_group;//шаблон до которого надо отрезать лишнее от начала файла
+            string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
+
+            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
+           
+            string file_name = @"shedold";
+            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
+            string url_png = get_url_png.Replace("&amp;", "&");//заменить символы ;
+
+            if (IsScheduleSaved(content, file_path, file_name, is_user_request))
+            {
+
+                Uri shed_pic = new Uri(url_png);
+                string caption_text = "Снимок расписания ";
+                DateTime thisDay = DateTime.Today;
+
+                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
+
+                if (x.Caption == caption_text + thisDay.ToString("d"))
+                {
+                    Console.WriteLine("Обновилась расписание на сайте");
+                }
+                else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
+            }
+
         }
         private static string ScheduleGet(string url, string pattern_start, string pattern_end, string[]for_replace)
         {
@@ -106,7 +142,6 @@ namespace ucit_bot_console
         }
         private static bool IsScheduleSaved(string new_content, string file_path, string file_name, bool is_user_request)
         {
-            
             string ext_html = @".html";
             string ext_png = @".png";
             FileInfo shedold = new FileInfo(file_path + file_name + ext_html);
@@ -131,9 +166,8 @@ namespace ucit_bot_console
 
         }
         private  async static void VkCheck(ChatId telegram_chat_id, string vk_wall_id , string file_path) //ChatId telegram_chat_id
-        {   
-            string key_path = @"d:\YandexDisk\UCIT2017\rasp\token_vk";
-            string token_vk = System.IO.File.ReadAllText(key_path);
+        {               
+            string token_vk = ConfigurationManager.AppSettings["token_vk"];
             string vk_text = "https://vk.com/wall-"; 
              // Количество записей, которое нам нужно получить.
             string count_item = "1";
@@ -165,6 +199,10 @@ namespace ucit_bot_console
             if (new_post_id != old_file)
             {
                 System.IO.File.WriteAllText(file_path + file_name, new_post_id);
+                Console.WriteLine("telegram_chat_id: {0} ", telegram_chat_id);
+                Console.WriteLine("vk_text: {0} ", vk_text);
+                Console.WriteLine("vk_wall_id: {0} ", vk_wall_id);
+                Console.WriteLine("new_post_id: {0} ", new_post_id);
                 Message x = await Bot.SendTextMessageAsync(telegram_chat_id, vk_text + vk_wall_id + "_" + new_post_id);
 
                 if (x.Text == vk_text + vk_wall_id + "_" + new_post_id)
