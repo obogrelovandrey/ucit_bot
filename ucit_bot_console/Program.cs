@@ -34,14 +34,15 @@ namespace ucit_bot_console
 
             string telegram_chat_id = ConfigurationManager.AppSettings["telegram_chat_id"];
             string vk_wall_id = ConfigurationManager.AppSettings["vk_wall_id"];
-                     
-            Bot.StartReceiving();                   
+            int sleep_time = int.Parse(ConfigurationManager.AppSettings["sleep_time"]);
+
+            Bot.StartReceiving();
            
             while (true)
             {
                 VkCheck(telegram_chat_id, vk_wall_id, file_path);
                 ScheduleCheckAndSend(telegram_chat_id, false, file_path);
-                Thread.Sleep(14400000);              
+                Thread.Sleep(sleep_time);
             }            
             //Console.ReadLine();
             //Bot.StopReceiving();  
@@ -52,7 +53,9 @@ namespace ucit_bot_console
             string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
             string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//шаблон до которого надо отрезать лишнее от начала файла
             string pattern_start = @"Текущая неделя №.+\d\D+";//шаблон до которого надо отрезать лишнее от начала файла            
-            string pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
+            string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
+            pattern_end = pattern_end.Replace("&lt;", "<");
+            pattern_end = pattern_end.Replace("&gt;", ">");
             string pattern = pattern_start + pattern_group;//шаблон до которого надо отрезать лишнее от начала файла
             string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
             string content = ScheduleGet(url, pattern, pattern_end, for_replace);
@@ -73,7 +76,7 @@ namespace ucit_bot_console
 
                 if (x.Caption == caption_text + thisDay.ToString("d"))
                 {
-                    Console.WriteLine("Обновилась расписание на сайте");
+                    Console.WriteLine("Отправка расписания с сайта");
                 }
                 else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
             }
@@ -85,7 +88,9 @@ namespace ucit_bot_console
             string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
             string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//шаблон до которого надо отрезать лишнее от начала файла
             string pattern_start = @"Текущая неделя №.+\d\D+";//шаблон до которого надо отрезать лишнее от начала файла
-            string pattern_end = @"<div align=right>";//шаблон после которой нужно все отрезать лишнее до конца файла
+            string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
+            pattern_end = pattern_end.Replace("&lt;", "<");
+            pattern_end = pattern_end.Replace("&gt;", ">");
             string pattern = pattern_start + pattern_group;//шаблон до которого надо отрезать лишнее от начала файла
             string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
 
@@ -106,7 +111,7 @@ namespace ucit_bot_console
 
                 if (x.Caption == caption_text + thisDay.ToString("d"))
                 {
-                    Console.WriteLine("Обновилась расписание на сайте");
+                    Console.WriteLine("Отправка расписания с сайта");
                 }
                 else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
             }
@@ -159,7 +164,7 @@ namespace ucit_bot_console
                .SetBrowserSize(900, 500)
                .SetCaptureZone(CaptureZone.VisibleScreen) // Зона захвата
                .SetTrigger(new WindowLoadTrigger()); // Set when the picture is taken
-                System.IO.File.WriteAllBytes(file_path + file_name + ext_png, screenshotJob.Freeze());                      
+                System.IO.File.WriteAllBytes(file_path + file_name + ext_png, screenshotJob.Freeze());
             return true; 
             }
             return false;
@@ -277,9 +282,9 @@ namespace ucit_bot_console
                             new KeyboardButton("Я.Диск")
                          }
                      });
-                    await Bot.SendTextMessageAsync(message.Chat.Id, "Какой ответ? ", ParseMode.Default, false, false, 0, replyMarkup: replyKeyboard);                  
+                    await Bot.SendTextMessageAsync(message.Chat.Id, "Какой ответ? ", ParseMode.Default, false, false, 0, replyMarkup: replyKeyboard);
                     break;
-                default:                    
+                default:
                     break;
             }
 
