@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Configuration;
 using System.Text;
 using System.Threading;
@@ -26,7 +26,8 @@ namespace ucit_bot_console
         {
             // int v2 = int.Parse(ConfigurationManager.AppSettings["Переменная2"]);
 
-            string file_path = ConfigurationManager.AppSettings["file_path"];
+           // string file_path = ConfigurationManager.AppSettings["file_path"];
+            
             string key = ConfigurationManager.AppSettings["telegram_token"];
            
             Bot = new TelegramBotClient(key);
@@ -40,83 +41,13 @@ namespace ucit_bot_console
            
             while (true)
             {
-                VkCheck(telegram_chat_id, vk_wall_id, file_path);
-                ScheduleCheckAndSend(telegram_chat_id, false, file_path);
+                VkCheck(telegram_chat_id, vk_wall_id);
+                ScheduleCheckAndSend(telegram_chat_id, false);
                 Thread.Sleep(sleep_time);
             }            
             //Console.ReadLine();
             //Bot.StopReceiving();  
             }
-      
-        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request, string file_path ) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
-        {
-            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
-            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//шаблон до которого надо отрезать лишнее от начала файла
-            string pattern_start = @"Текущая неделя №.+\d\D+";//шаблон до которого надо отрезать лишнее от начала файла            
-            string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
-            pattern_end = pattern_end.Replace("&lt;", "<");
-            pattern_end = pattern_end.Replace("&gt;", ">");
-            string pattern = pattern_start + pattern_group;//шаблон до которого надо отрезать лишнее от начала файла
-            string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
-            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
-          
-            string file_name = @"shedold";
-            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
-            string url_png = get_url_png.Replace( "&amp;","&");//заменить символы ;
-
-
-            if (IsScheduleSaved(content, file_path, file_name, is_user_request))
-            {
-
-                Uri shed_pic = new Uri(url_png);
-                string caption_text = "Снимок расписания ";
-                DateTime thisDay = DateTime.Today;
-                
-                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
-
-                if (x.Caption == caption_text + thisDay.ToString("d"))
-                {
-                    Console.WriteLine("Отправка расписания с сайта");
-                }
-                else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
-            }
-           
-        }
-        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание; is_user_request - не сравнивать со старым файлом. 
-        {
-            string file_path = ConfigurationManager.AppSettings["file_path"];
-            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
-            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//шаблон до которого надо отрезать лишнее от начала файла
-            string pattern_start = @"Текущая неделя №.+\d\D+";//шаблон до которого надо отрезать лишнее от начала файла
-            string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
-            pattern_end = pattern_end.Replace("&lt;", "<");
-            pattern_end = pattern_end.Replace("&gt;", ">");
-            string pattern = pattern_start + pattern_group;//шаблон до которого надо отрезать лишнее от начала файла
-            string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
-
-            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
-           
-            string file_name = @"shedold";
-            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
-            string url_png = get_url_png.Replace("&amp;", "&");//заменить символы ;
-
-            if (IsScheduleSaved(content, file_path, file_name, is_user_request))
-            {
-
-                Uri shed_pic = new Uri(url_png);
-                string caption_text = "Снимок расписания ";
-                DateTime thisDay = DateTime.Today;
-
-                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
-
-                if (x.Caption == caption_text + thisDay.ToString("d"))
-                {
-                    Console.WriteLine("Отправка расписания с сайта");
-                }
-                else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
-            }
-
-        }
         private static string ScheduleGet(string url, string pattern_start, string pattern_end, string[]for_replace)
         {
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -160,8 +91,11 @@ namespace ucit_bot_console
             {
                 System.IO.File.WriteAllText(file_path + file_name + ext_html, new_content, Encoding.GetEncoding(65001));
 
+                int browser_height = int.Parse(ConfigurationManager.AppSettings["browser_height"]);
+                int browser_widht = int.Parse(ConfigurationManager.AppSettings["browser_widht"]);
+
                 var screenshotJob = ScreenshotJobBuilder.Create(file_path + file_name+ ext_html)
-               .SetBrowserSize(900, 500)
+               .SetBrowserSize(browser_widht, browser_height)
                .SetCaptureZone(CaptureZone.VisibleScreen) // Зона захвата
                .SetTrigger(new WindowLoadTrigger()); // Set when the picture is taken
                 System.IO.File.WriteAllBytes(file_path + file_name + ext_png, screenshotJob.Freeze());
@@ -170,10 +104,92 @@ namespace ucit_bot_console
             return false;
 
         }
-        private  async static void VkCheck(ChatId telegram_chat_id, string vk_wall_id , string file_path) //ChatId telegram_chat_id
+        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request, string file_path) //telegram_chat_id - в какой чат отправлять расписание по умолчанию; is_user_request - не сравнивать со старым файлом. Путь передается переменной. 
+        {
+            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
+            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//конец шаблона до которого надо отрезать лишнее от начала файла
+            string pattern = @"Текущая неделя №.+\d\D+";//начало шаблона до которого надо отрезать лишнее от начала файла
+            string pattern_start = ConfigurationManager.AppSettings["pattern_start"];
+            if (pattern_start == "")
+                pattern_start = pattern + pattern_group;//полный шаблон до которого надо отрезать лишнее от начала файла 
+            else
+            {
+                pattern_start = pattern_start.Replace("&lt;", "<");
+                pattern_start = pattern_start.Replace("&gt;", ">");
+            }
+            string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
+            pattern_end = pattern_end.Replace("&lt;", "<");
+            pattern_end = pattern_end.Replace("&gt;", ">");
+            string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
+            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
+          
+            string file_name = @"shedold";
+            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
+            string url_png = get_url_png.Replace( "&amp;","&");//заменить символы ;
+
+
+            if (IsScheduleSaved(content, file_path, file_name, is_user_request))
+            {
+
+                Uri shed_pic = new Uri(url_png);
+                string caption_text = "Снимок расписания ";
+                DateTime thisDay = DateTime.Today;
+                
+                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));
+
+                if (x.Caption == caption_text + thisDay.ToString("d"))
+                {
+                    Console.WriteLine("Отправка расписания с сайта");
+                }
+                else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
+            }
+           
+        }
+        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание по умолчанию; is_user_request - не сравнивать со старым файлом. Путь берет из файла config 
+        {
+            string file_path = ConfigurationManager.AppSettings["file_path"];
+            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
+            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//конец шаблона до которого надо отрезать лишнее от начала файла
+            string pattern = @"Текущая неделя №.+\d\D+";//начало шаблона до которого надо отрезать лишнее от начала файла
+            string pattern_start = ConfigurationManager.AppSettings["pattern_start"];
+            if (pattern_start == "")
+                pattern_start = pattern + pattern_group;//полный шаблон до которого надо отрезать лишнее от начала файла 
+            else
+            {
+                pattern_start = pattern_start.Replace("&lt;", "<");
+                pattern_start = pattern_start.Replace("&gt;", ">");
+            }
+            string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
+            pattern_end = pattern_end.Replace("&lt;", "<");
+            pattern_end = pattern_end.Replace("&gt;", ">");
+            string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
+            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
+
+            string file_name = @"shedold";
+            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
+            string url_png = get_url_png.Replace("&amp;", "&");//заменить символы ;
+
+            if (IsScheduleSaved(content, file_path, file_name, is_user_request))
+            {
+
+                Uri shed_pic = new Uri(url_png);
+                string caption_text = "Снимок расписания ";
+                DateTime thisDay = DateTime.Today;
+
+                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
+
+                if (x.Caption == caption_text + thisDay.ToString("d"))
+                {
+                    Console.WriteLine("Отправка расписания с сайта");
+                }
+                else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
+            }
+
+        }
+        private  async static void VkCheck(ChatId telegram_id, string vk_wall_id) //куда отправлять сообщение и за какой стеной в ВК следить 
         {               
             string token_vk = ConfigurationManager.AppSettings["token_vk"];
-            string vk_text = "https://vk.com/wall-"; 
+            string vk_pattern_url = "https://vk.com/wall-"; 
              // Количество записей, которое нам нужно получить.
             string count_item = "1";
             // Получаем информацию, подставив все данные выше.
@@ -191,8 +207,10 @@ namespace ucit_bot_console
             Regex regex = new Regex(pattern_id);
             Match index = regex.Match(new_post_id);
             new_post_id = index.ToString().Replace("<id>", "");
-                       
-            string file_name = @"vkold";
+
+            string file_path = ConfigurationManager.AppSettings["file_path"];           
+            string file_name = @"vk_last_check"; //имя файла в котором будет сохранятся номер последней записи
+           
 
             FileInfo vkold = new FileInfo(file_path + file_name);
             if (!vkold.Exists)
@@ -204,13 +222,9 @@ namespace ucit_bot_console
             if (new_post_id != old_file)
             {
                 System.IO.File.WriteAllText(file_path + file_name, new_post_id);
-                Console.WriteLine("telegram_chat_id: {0} ", telegram_chat_id);
-                Console.WriteLine("vk_text: {0} ", vk_text);
-                Console.WriteLine("vk_wall_id: {0} ", vk_wall_id);
-                Console.WriteLine("new_post_id: {0} ", new_post_id);
-                Message x = await Bot.SendTextMessageAsync(telegram_chat_id, vk_text + vk_wall_id + "_" + new_post_id);
+                Message x = await Bot.SendTextMessageAsync(telegram_id, vk_pattern_url + vk_wall_id + "_" + new_post_id);
 
-                if (x.Text == vk_text + vk_wall_id + "_" + new_post_id)
+                if (x.Text == vk_pattern_url + vk_wall_id + "_" + new_post_id)
                 {
                     Console.WriteLine("Обновилась запись в группе ВК");
                    
