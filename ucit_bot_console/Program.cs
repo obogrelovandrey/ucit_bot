@@ -36,13 +36,22 @@ namespace ucit_bot_console
             string telegram_chat_id = ConfigurationManager.AppSettings["telegram_chat_id"];
             string vk_wall_id = ConfigurationManager.AppSettings["vk_wall_id"];
             int sleep_time = int.Parse(ConfigurationManager.AppSettings["sleep_time"]);
+            
+            string pattern_group_1 = ConfigurationManager.AppSettings["pattern_group_1"];//конец шаблона до которого надо отрезать лишнее от начала файла
+            string pattern_group_2 = ConfigurationManager.AppSettings["pattern_group_2"];//конец шаблона до которого надо отрезать лишнее от начала файла
+            string pattern_group_3 = ConfigurationManager.AppSettings["pattern_group_3"];//конец шаблона до которого надо отрезать лишнее от начала файла
 
+            string url_png_group_1 = ConfigurationManager.AppSettings["url_png_group_1"];//ССылка на картинку через яндекс диск";
+            string url_png_group_2 = ConfigurationManager.AppSettings["url_png_group_2"];//ССылка на картинку через яндекс диск";
+            string url_png_group_3 = ConfigurationManager.AppSettings["url_png_group_3"];//ССылка на картинку через яндекс диск";
             Bot.StartReceiving();
            
             while (true)
             {
                 VkCheck(telegram_chat_id, vk_wall_id);
-                ScheduleCheckAndSend(telegram_chat_id, false);
+                ScheduleCheckAndSend(telegram_chat_id, false, pattern_group_1, url_png_group_1);
+                ScheduleCheckAndSend(telegram_chat_id, false, pattern_group_2, url_png_group_2);
+                ScheduleCheckAndSend(telegram_chat_id, false, pattern_group_3, url_png_group_3);
                 Thread.Sleep(sleep_time);
             }            
             //Console.ReadLine();
@@ -104,29 +113,25 @@ namespace ucit_bot_console
             return false;
 
         }
-        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request, string file_path) //telegram_chat_id - в какой чат отправлять расписание по умолчанию; is_user_request - не сравнивать со старым файлом. Путь передается переменной. 
+        private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request, string pattern_group, string get_url_png) //telegram_chat_id - в какой чат отправлять расписание по умолчанию; is_user_request - не сравнивать со старым файлом. Путь передается переменной. 
         {
-            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
-            string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//конец шаблона до которого надо отрезать лишнее от начала файла
+            string file_path = ConfigurationManager.AppSettings["file_path"];
+            string url = ConfigurationManager.AppSettings["url"];//страница для парсинга            
             string pattern = @"Текущая неделя №.+\d\D+";//начало шаблона до которого надо отрезать лишнее от начала файла
-            string pattern_start = ConfigurationManager.AppSettings["pattern_start"];
-            if (pattern_start == "")
-                pattern_start = pattern + pattern_group;//полный шаблон до которого надо отрезать лишнее от начала файла 
-            else
-            {
-                pattern_start = pattern_start.Replace("&lt;", "<");
-                pattern_start = pattern_start.Replace("&gt;", ">");
-            }
+            string pattern_start = pattern + pattern_group;
             string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
             pattern_end = pattern_end.Replace("&lt;", "<");
             pattern_end = pattern_end.Replace("&gt;", ">");
             string[] for_replace = { "</div>", "&nbsp;" };//если в тексте встречается текст, который нам не нужен, вырезаем его
-            string content = ScheduleGet(url, pattern, pattern_end, for_replace);
-          
-            string file_name = @"shedold";
-            string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
-            string url_png = get_url_png.Replace( "&amp;","&");//заменить символы ;
+            string content = ScheduleGet(url, pattern_start, pattern_end, for_replace);
 
+            string file_name = pattern_group;
+            if (file_name == "")
+                {
+                file_name = @"shedold";
+                }
+            //string get_url_png = ConfigurationManager.AppSettings["url_png"];//ССылка на картинку через яндекс диск";
+            string url_png = get_url_png.Replace("&amp;", "&");//заменить символы ;
 
             if (IsScheduleSaved(content, file_path, file_name, is_user_request))
             {
@@ -134,16 +139,16 @@ namespace ucit_bot_console
                 Uri shed_pic = new Uri(url_png);
                 string caption_text = "Снимок расписания ";
                 DateTime thisDay = DateTime.Today;
-                
-                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d"));
+
+                Message x = await Bot.SendPhotoAsync(telegram_chat_id, new FileToSend(shed_pic), caption: caption_text + thisDay.ToString("d")); ;
 
                 if (x.Caption == caption_text + thisDay.ToString("d"))
                 {
-                    Console.WriteLine("Отправка расписания с сайта");
+                    Console.WriteLine("Отправка расписания с сайта " + file_name);
                 }
                 else Console.WriteLine("Хмм, попробуй еще раз, картинка с расписанием не отправляется");
             }
-           
+
         }
         private async static void ScheduleCheckAndSend(ChatId telegram_chat_id, bool is_user_request) //telegram_chat_id - в какой чат отправлять расписание по умолчанию; is_user_request - не сравнивать со старым файлом. Путь берет из файла config 
         {
@@ -151,14 +156,7 @@ namespace ucit_bot_console
             string url = ConfigurationManager.AppSettings["url"];//страница для парсинга
             string pattern_group = ConfigurationManager.AppSettings["pattern_group"];//конец шаблона до которого надо отрезать лишнее от начала файла
             string pattern = @"Текущая неделя №.+\d\D+";//начало шаблона до которого надо отрезать лишнее от начала файла
-            string pattern_start = ConfigurationManager.AppSettings["pattern_start"];
-            if (pattern_start == "")
-                pattern_start = pattern + pattern_group;//полный шаблон до которого надо отрезать лишнее от начала файла 
-            else
-            {
-                pattern_start = pattern_start.Replace("&lt;", "<");
-                pattern_start = pattern_start.Replace("&gt;", ">");
-            }
+            string pattern_start = pattern + pattern_group;
             string pattern_end = ConfigurationManager.AppSettings["pattern_end"];//шаблон после которой нужно все отрезать лишнее до конца файла
             pattern_end = pattern_end.Replace("&lt;", "<");
             pattern_end = pattern_end.Replace("&gt;", ">");
